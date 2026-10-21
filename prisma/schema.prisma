@@ -1,0 +1,165 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  role         String    @default("buyer") // "buyer", "seller", "admin"
+  avatar       String?
+  password     String?
+  rating       Float     @default(5.0)
+  dealCount    Int       @default(0)
+  status       String    @default("Active") // "Active", "Suspended", "Restricted"
+  tier         String    @default("Tier 1")
+  createdAt    DateTime  @default(now())
+
+  // Relations
+  listings     Listing[]
+  buyerOrders  Order[]   @relation("BuyerOrders")
+  sellerOrders Order[]   @relation("SellerOrders")
+  payouts      Payout[]
+  sessions     Session[]
+}
+
+model Listing {
+  id              String   @id
+  sku             String?
+  title           String
+  category        String   // "accounts", "keys", "currency", "social"
+  price           Float
+  originalPrice   Float?
+  discountPercent Int?
+  image           String
+  imageAlt        String?
+  platform        String
+  region          String
+  deliveryType    String   @default("instant")
+  deliveryTimeText String?
+  status          String   @default("Active") // "Active", "Paused", "Draft", "Sold Out"
+  views           Int      @default(0)
+  watchers        Int      @default(0)
+  stockCount      Int      @default(1)
+  keysInVault     Int      @default(0)
+  priceSub        String?
+  rating          Float    @default(5.0)
+  reviewsCount    Int      @default(1)
+  rank            String?
+  rankLevelText   String?
+  skinCount       Int?
+  isEmailIncluded Boolean  @default(true)
+  isOnline        Boolean  @default(true)
+  tags            String   @default("[]") // JSON stringified tags array
+
+  sellerId        String?
+  sellerName      String?
+  seller          User?    @relation(fields: [sellerId], references: [id])
+  orders          Order[]
+  createdAt       DateTime @default(now())
+}
+
+model Order {
+  id                   String   @id
+  orderNumber          String   @unique
+  itemTitle            String
+  image                String?
+  tag                  String   @default("Escrow Hold")
+  category             String   @default("accounts")
+  deliveryType         String   @default("Instant Automated")
+  price                Float
+  sellerName           String
+  sellerLevel          String?
+  sellerRating         Float    @default(4.98)
+  sellerSales          String?
+  buyerName            String?
+  buyerId              String?
+  buyer                User?    @relation("BuyerOrders", fields: [buyerId], references: [id])
+  sellerId             String?
+  sellerUser           User?    @relation("SellerOrders", fields: [sellerId], references: [id])
+  listingId            String?
+  listing              Listing? @relation(fields: [listingId], references: [id])
+  status               String   @default("active") // "active", "delivered", "warranty", "disputed"
+  statusText           String   @default("48h Inspection Window")
+  warrantyLeft         String?
+  escrowTimeRemaining  String?
+  decryptedKey         String?
+  credentialsLogin     String?
+  credentialsEmail     String?
+  credentialsPass      String?
+  credentialsPin       String?
+  disputeCaseId        String?
+  disputeResolutionNote String?
+  paymentMethod        String   @default("card")
+  timestamp            DateTime @default(now())
+}
+
+model Thread {
+  id          String    @id
+  orderNumber String?
+  orderId     String?
+  sellerName  String
+  buyerName   String?
+  type        String    @default("active") // "active", "archived", "dispute"
+  messages    Message[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Message {
+  id          String   @id
+  threadId    String
+  thread      Thread   @relation(fields: [threadId], references: [id])
+  sender      String   // "buyer", "seller", "system", "admin"
+  senderName  String?
+  text        String
+  time        String?
+  isEncrypted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Payout {
+  id          String   @id
+  sellerName  String
+  sellerId    String?
+  seller      User?    @relation(fields: [sellerId], references: [id])
+  amount      Float
+  method      String
+  destination String
+  status      String   @default("Completed")
+  createdAt   DateTime @default(now())
+}
+
+// Durable escrow ledger: full-fidelity order payloads (buyer identity, vault
+// credentials, payment records) with queryable indexed columns.
+model OrderRecord {
+  id          String   @id
+  status      String   @default("active")
+  sellerName  String   @default("AeroGamingDeals")
+  buyerEmail  String?
+  price       Float    @default(0)
+  data        Json
+  updatedAt   DateTime @updatedAt
+}
+
+// Stores complex collections (listings, threads, reviews, payouts, overview)
+// that have rich nested shapes with no query columns.
+model BundleRecord {
+  key       String   @id
+  data      Json
+  updatedAt DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}

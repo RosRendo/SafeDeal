@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EscrowDeal 🛡️
 
-## Getting Started
+A production-grade escrow marketplace for high-value digital assets, social media accounts, domain names, and digital contracts.
 
-First, run the development server:
+Built with Next.js 16 (Turbopack + Partial Prerendering), Tailwind CSS v4, Prisma ORM (PostgreSQL), and Stripe Escrow rails.
+
+---
+
+## ⚡ Core Features
+
+- **Automated Escrow Hold & Release**: Funds are authorized and held in escrow (`manual_capture` or simulated) until buyer confirms asset delivery.
+- **Role-Based Workflows**: Buyer, Seller, and Admin dashboards with granular permissions and audit logging.
+- **Dispute Resolution Protocol**: Multi-stage dispute handling, evidence submission, and admin-mediated settlement (refund / partial split / release).
+- **Hardened Server Authentication**: Scrypt password hashing with HttpOnly session cookies (`sd_session`) and CSRF protection.
+- **Real-Time Activity & Webhooks**: Webhook event processing for Stripe payment intents, dispute state transitions, and delivery notifications.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 16 (App Router + Turbopack)
+- **Styling**: Tailwind CSS v4 + Vanilla CSS Design System
+- **Database**: PostgreSQL with Prisma ORM
+- **Animations & UX**: Motion (Framer Motion v14) & Lenis smooth scroll
+- **Payments**: Stripe API (Manual Capture Escrow & Webhook listener) / Simulation fallback
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone & Install
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/ROS-RENDO/EscrowDeal.git
+cd EscrowDeal
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Configure Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Copy `.env.example` to `.env` and fill in your values:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.example .env
+```
 
-## Learn More
+```env
+DATABASE_URL="postgresql://postgres:password@localhost:5432/safedeal"
+SESSION_SECRET="your-32-character-secret-key"
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 3. Database Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npx prisma db push
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📦 Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [deploy.md](deploy.md) for the complete production checklist (Vercel, Railway, Neon/Supabase PostgreSQL, and Stripe webhook configuration).
