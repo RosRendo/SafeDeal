@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
   }
 
   // User row must be durable before the Session row references it.
-  await flushUsers().catch(() => {});
+  await flushUsers();
   let token: string;
   try {
     const created = await createSessionToken(user.id);

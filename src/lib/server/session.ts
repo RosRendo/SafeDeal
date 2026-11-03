@@ -44,27 +44,18 @@ export function sessionCookieOptions(maxAgeSeconds = SESSION_TTL_MS / 1000) {
   };
 }
 
-// Creates a durable session row when DB is reachable and returns the signed token value.
-// Encodes userId directly in the HMAC payload so authentication is resilient even if DB is unavailable.
+// Creates a durable session row and returns the signed token value.
 export async function createSessionToken(userId: string): Promise<{ token: string; expiresAt: Date }> {
   const nonce = crypto.randomBytes(24).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-
-  try {
-    if (process.env.DATABASE_URL) {
-      await prisma.session.create({
-        data: {
-          tokenHash: hashToken(nonce),
-          userId,
-          expiresAt,
-        },
-      });
-    }
-  } catch (err) {
-    console.warn("[Session] DB session record creation failed, relying on signed cookie token:", err);
-  }
-
-  const payload = `${nonce}.${userId}.${expiresAt.getTime()}`;
+  await prisma.session.create({
+    data: {
+      tokenHash: hashToken(nonce),
+      userId,
+      expiresAt,
+    },
+  });
+  const payload = `${nonce}.${expiresAt.getTime()}`;
   const token = `${payload}.${sign(payload)}`;
   return { token, expiresAt };
 }
@@ -89,93 +80,56 @@ export function clearSessionCookie(response: NextResponse) {
 
 interface CookieSessionCheck {
   nonce: string;
-  userId?: string;
   valid: boolean;
 }
 
 function parseToken(raw: string | undefined): CookieSessionCheck {
   if (!raw) return { nonce: "", valid: false };
   const parts = raw.split(".");
-
-  // Resilient 4-part token: nonce.userId.exp.sig
-  if (parts.length === 4) {
-    const [nonce, userId, exp, sig] = parts;
-    const payload = `${nonce}.${userId}.${exp}`;
-    if (sign(payload) !== sig) return { nonce: "", valid: false };
-    const expTime = Number(exp);
-    if (!Number.isFinite(expTime) || expTime < Date.now()) return { nonce: "", valid: false };
-    return { nonce, userId, valid: true };
-  }
-
-  // Legacy 3-part token: nonce.exp.sig
-  if (parts.length === 3) {
-    const [nonce, exp, sig] = parts;
-    const payload = `${nonce}.${exp}`;
-    if (sign(payload) !== sig) return { nonce: "", valid: false };
-    const expTime = Number(exp);
-    if (!Number.isFinite(expTime) || expTime < Date.now()) return { nonce: "", valid: false };
-    return { nonce, valid: true };
-  }
-
-  return { nonce: "", valid: false };
+  if (parts.length !== 3) return { nonce: "", valid: false };
+  const [nonce, exp, sig] = parts;
+  const payload = `${nonce}.${exp}`;
+  if (sign(payload) !== sig) return { nonce: "", valid: false };
+  const expTime = Number(exp);
+  if (!Number.isFinite(expTime) || expTime < Date.now()) return { nonce: "", valid: false };
+  return { nonce, valid: true };
 }
 
 export async function getAuthContext(
   req: NextRequest
 ): Promise<SessionUser | null> {
   await ensureHydrated();
-  const { nonce, userId, valid } = parseToken(req.cookies.get(SESSION_COOKIE)?.value);
+  const { nonce, valid } = parseToken(req.cookies.get(SESSION_COOKIE)?.value);
   if (!valid || !nonce) return null;
 
   try {
-    if (process.env.DATABASE_URL) {
-      const session = await prisma.session.findUnique({
-        where: { tokenHash: hashToken(nonce) },
-        include: { user: true },
-      });
-      if (session) {
-        if (session.expiresAt.getTime() < Date.now()) {
-          await prisma.session.delete({ where: { tokenHash: session.tokenHash } }).catch(() => {});
-          return null;
-        }
-
-        const u = session.user;
-        if (!u || u.status === "Suspended") return null;
-
-        return {
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: (u.role as SessionUser["role"]) || "buyer",
-          avatar: u.avatar || "",
-          rating: u.rating,
-          dealCount: u.dealCount,
-          isVerified: u.status !== "Restricted",
-        };
-      }
+    const session = await prisma.session.findUnique({
+      where: { tokenHash: hashToken(nonce) },
+      include: { user: true },
+    });
+    if (!session) return null;
+    if (session.expiresAt.getTime() < Date.now()) {
+      await prisma.session.delete({ where: { tokenHash: session.tokenHash } }).catch(() => {});
+      return null;
     }
-  } catch (err) {
-    console.warn("[Session] DB session lookup failed, falling back to memory store:", err);
-  }
 
-  // Resilient memory store fallback: when DB is not reachable or session row isn't in DB
-  if (userId) {
-    const u = db.users.findById(userId);
-    if (u && u.status !== "Suspended") {
-      return {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: (u.role as SessionUser["role"]) || "buyer",
-        avatar: u.avatar || "",
-        rating: u.rating,
-        dealCount: u.dealCount,
-        isVerified: u.status !== "Restricted",
-      };
-    }
-  }
+    const u = session.user;
+    if (!u || u.status === "Suspended") return null;
 
-  return null;
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: (u.role as SessionUser["role"]) || "buyer",
+      avatar: u.avatar || "",
+      rating: u.rating,
+      dealCount: u.dealCount,
+      isVerified: u.status !== "Restricted",
+    };
+  } catch {
+    // Database hiccup: fail closed rather than granting access.
+    return null;
+  }
 }
 
 export function unauthorized(message = "Sign in to continue.") {

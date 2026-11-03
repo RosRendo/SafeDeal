@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://safedeal.dashboardkiller.online/api/$1"
+    }
+  ]
+}

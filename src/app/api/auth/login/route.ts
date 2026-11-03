@@ -39,8 +39,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // The Session row references the User row — try persisting if DB is available.
-  await flushUsers().catch(() => {});
+  // The Session row references the User row — make sure it is durable first.
+  await flushUsers();
   let token: string;
   try {
     const created = await createSessionToken(user.id);
