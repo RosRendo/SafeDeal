@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db, ensureHydrated } from "@/lib/server/db";
 import { hashPassword } from "@/lib/server/password";
 import { flushUsers } from "@/lib/server/persist";
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
   }
 
   // User row must be durable before the Session row references it.
-  await flushUsers();
+  await flushUsers().catch(() => {});
   let token: string;
   try {
     const created = await createSessionToken(user.id);

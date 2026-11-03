@@ -346,6 +346,8 @@ export async function flushUsers(): Promise<void> {
       dirtyUsers.delete(id);
     }
     flushedOnce = true;
+  } catch (err) {
+    console.warn("[Persist] flushUsers failed:", err);
   } finally {
     flushing = false;
   }
