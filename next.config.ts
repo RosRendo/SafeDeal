@@ -67,6 +67,19 @@ const nextConfig: NextConfig = {
       { source: "/sanctions", destination: "/admin/users/sanctions", permanent: true },
     ];
   },
+  async rewrites() {
+    if (process.env.VERCEL) {
+      return {
+        beforeFiles: [
+          {
+            source: "/api/:path*",
+            destination: "https://safedeal.dashboardkiller.online/api/:path*",
+          },
+        ],
+      };
+    }
+    return [];
+  },
 };
 
 export default nextConfig;
