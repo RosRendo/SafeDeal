@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: safedeal_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: safedeal
+    ports:
+      - "5432:5432"
+    volumes:
+      - safedeal_postgres_data:/var/lib/postgresql/data
+    networks:
+      - safedeal_network
+
+  app:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: safedeal_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/safedeal?schema=public
+      SESSION_SECRET: dev_safedeal_session_secret_32_characters_2026
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    depends_on:
+      - postgres
+    networks:
+      - safedeal_network
+
+volumes:
+  safedeal_postgres_data:
+    driver: local
+
+networks:
+  safedeal_network:
+    driver: bridge
